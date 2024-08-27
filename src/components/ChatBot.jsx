@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Box, TextField, Button, Typography, Card, CardContent, Grid, IconButton } from '@mui/material';
+import { Box, TextField, Button, Typography, Card, CardContent, Grid, IconButton, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import humanImg from "./assets/human.png";
 import robotImg from "./assets/robot.png";
-import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
-import ThumbDownAltIcon from '@mui/icons-material/ThumbDownAlt';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import { format } from 'date-fns';
 
 const ChatBot = ({ data, view, onViewChange }) => {
     const [chatHistory, setChatHistory] = useState([]);
     const [input, setInput] = useState('');
     const [showIntro, setShowIntro] = useState(true);
+    const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+    const [currentFeedbackIndex, setCurrentFeedbackIndex] = useState(null);
+    const [feedbackText, setFeedbackText] = useState('');
+    const [feedbackType, setFeedbackType] = useState('');
 
     useEffect(() => {
         if (view === 'past') {
@@ -57,13 +62,35 @@ const ChatBot = ({ data, view, onViewChange }) => {
         }
     };
 
-    const handleSaveFeedback = (index, feedback) => {
-        const updatedChatHistory = [...chatHistory];
-        if (updatedChatHistory[index].type === 'bot') {
-            updatedChatHistory[index].feedback = feedback;
+    const handleSaveFeedback = () => {
+        console.log('Chat History:', chatHistory);
+        // Save chat history to local storage or backend
+        localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+    };
+
+    const handleOpenFeedbackDialog = (index, type) => {
+        setCurrentFeedbackIndex(index);
+        setFeedbackType(type);
+        setFeedbackDialogOpen(true);
+    };
+
+    const handleCloseFeedbackDialog = () => {
+        setFeedbackDialogOpen(false);
+        setCurrentFeedbackIndex(null);
+        setFeedbackText('');
+    };
+
+    const handleFeedbackSubmit = () => {
+        if (currentFeedbackIndex !== null && feedbackText.trim()) {
+            const updatedChatHistory = [...chatHistory];
+            updatedChatHistory[currentFeedbackIndex].feedback = {
+                type: feedbackType,
+                text: feedbackText.trim()
+            };
             setChatHistory(updatedChatHistory);
-            // Here you might save the feedback to a backend or local storage
+            localStorage.setItem('chatHistory', JSON.stringify(updatedChatHistory));
         }
+        handleCloseFeedbackDialog();
     };
 
     const quickQuestions = [
@@ -97,13 +124,18 @@ const ChatBot = ({ data, view, onViewChange }) => {
                                         <Typography variant="caption" color="text.secondary">
                                             {msg.time}
                                         </Typography>
-                                        {msg.type === 'bot' && (
+                                        {msg.type === 'bot' && msg.feedback && (
+                                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                                Feedback: {msg.feedback.text}
+                                            </Typography>
+                                        )}
+                                        {msg.type === 'bot' && !msg.feedback && (
                                             <Box sx={{ display: 'flex', mt: 1 }}>
-                                                <IconButton onClick={() => handleSaveFeedback(index, 'like')}>
-                                                    <ThumbUpAltIcon color="primary" />
+                                                <IconButton onClick={() => handleOpenFeedbackDialog(index, 'like')} sx={{ mr: 1 }}>
+                                                    <ThumbUpIcon />
                                                 </IconButton>
-                                                <IconButton onClick={() => handleSaveFeedback(index, 'dislike')}>
-                                                    <ThumbDownAltIcon color="error" />
+                                                <IconButton onClick={() => handleOpenFeedbackDialog(index, 'dislike')}>
+                                                    <ThumbDownIcon />
                                                 </IconButton>
                                             </Box>
                                         )}
@@ -158,7 +190,7 @@ const ChatBot = ({ data, view, onViewChange }) => {
                         <Button variant="contained" onClick={() => handleSend()} sx={{ mr: 2 }}>
                             Ask
                         </Button>
-                        <Button variant="outlined" onClick={() => handleSaveFeedback()}>
+                        <Button variant="outlined" onClick={handleSaveFeedback}>
                             Save
                         </Button>
                     </Box>
@@ -190,9 +222,19 @@ const ChatBot = ({ data, view, onViewChange }) => {
                                         {msg.time}
                                     </Typography>
                                     {msg.type === 'bot' && msg.feedback && (
-                                        <Typography variant="caption" color={msg.feedback === 'like' ? 'success.main' : 'error.main'}>
-                                            {msg.feedback === 'like' ? 'Liked' : 'Disliked'}
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            Feedback: {msg.feedback.text}
                                         </Typography>
+                                    )}
+                                    {msg.type === 'bot' && !msg.feedback && (
+                                        <Box sx={{ display: 'flex', mt: 1 }}>
+                                            <IconButton onClick={() => handleOpenFeedbackDialog(index, 'like')} sx={{ mr: 1 }}>
+                                                <ThumbUpIcon />
+                                            </IconButton>
+                                            <IconButton onClick={() => handleOpenFeedbackDialog(index, 'dislike')}>
+                                                <ThumbDownIcon />
+                                            </IconButton>
+                                        </Box>
                                     )}
                                 </Box>
                             </Box>
@@ -205,6 +247,34 @@ const ChatBot = ({ data, view, onViewChange }) => {
                     </Box>
                 </>
             )}
+
+            <Dialog open={feedbackDialogOpen} onClose={handleCloseFeedbackDialog}>
+                <DialogTitle>Provide Additional Feedback</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <LightbulbIcon sx={{ fontSize: 40, mr: 2 }} />
+                        <TextField
+                            autoFocus
+                            multiline
+                            rows={4}
+                            fullWidth
+                            variant="outlined"
+                            placeholder="Type your feedback here..."
+                            value={feedbackText}
+                            onChange={(e) => setFeedbackText(e.target.value)}
+                            sx={{ flex: 1 }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleFeedbackSubmit} color="primary">
+                        Submit
+                    </Button>
+                    <Button onClick={handleCloseFeedbackDialog}>
+                        Cancel
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
